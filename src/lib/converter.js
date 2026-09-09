@@ -73,7 +73,7 @@ export const SKY_INSTRUMENTS = Object.keys(INSTBE)
 /** Turn an arbitrary name into a safe fake-player / tag token. */
 export function sanitizeSongName(name) {
   const cleaned = String(name || '')
-    .replace(/[^0-9a-zA-Z_.-]/g, '_')
+    .replace(/\P{ID_Continue}/gu, '_')
     .replace(/^_+|_+$/g, '');
   return cleaned || 'song';
 }
