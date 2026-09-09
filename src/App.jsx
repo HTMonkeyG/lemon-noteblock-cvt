@@ -101,7 +101,8 @@ export default function App() {
   return (
     <div className="app">
       <header className="hero">
-        <h1>Lemon&apos;s Note Converter</h1>
+        <div className="logo" aria-hidden="true">♫</div>
+        <h1>Lemon&apos;s Noteblock Converter</h1>
         <p className="subtitle">
           将 <code>.nbs</code> 与 <code>.txt</code> / <code>.skysheet.json</code> 乐谱
           转换为 Minecraft 基岩版 <code>.mcstructure</code> 结构文件。
@@ -196,19 +197,21 @@ export default function App() {
         <section className="howto">
           <h2>工作原理</h2>
           <p>
-            相同的音符被编译为一条 <code>playsound</code> 指令，并通过
-            <code>scoreboard</code>与<code>execute</code>计时器（<code>tick.歌曲名
-            generic.song</code>）控制。
-            命令方块按「重复 + 链」列排布，导出为可直接用结构方块加载的
-            <code>.mcstructure</code>。目标玩家需携带 <code>song.歌曲名</code> 标签。
+            压缩相同的音符至一条 <code>execute ... playsound</code> 指令，并通过
+            <code>scoreboard tick.歌曲名 generic.song</code>计时。
+            生成的命令方块按链排布，导出为可直接用结构方块加载的<code>.mcstructure</code>。
+            目标玩家需携带 <code>song.歌曲名</code> 标签。
           </p>
         </section>
       )}
 
       <footer className="footer">
-        <span>基于 nbs-note.js · sky-studio-abc-js · mcstructure-js</span>
-        <br />
-        <span>By HTMonkeyG</span>
+        <span>
+          基于 <a href="http://npmjs.com/package/nbs-note.js">nbs-note.js</a> · <a href="http://npmjs.com/package/sky-studio-abc-js">sky-studio-abc-js</a> · <a href="http://npmjs.com/package/mcstructure-js">mcstructure-js</a>
+        </span><br />
+        <span>Compression by HTMonkeyG</span><br />
+        <span>UI by DeepSeek</span><br />
+        <span>Developed only for OxygenLemon</span><br />
       </footer>
     </div>
   );
