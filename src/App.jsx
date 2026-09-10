@@ -35,15 +35,16 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [instrument, setInstrument] = useState(0);
   const [maxLen, setMaxLen] = useState('2000');
+  const [offset, setOffset] = useState('0');
   const inputRef = useRef(null);
 
-  const runConvert = useCallback((f, nameOverride, inst, mlen) => {
+  const runConvert = useCallback((f, nameOverride, inst, mlen, off) => {
     setBusy(true);
     setError('');
     // Yield so the busy spinner paints before the (possibly heavy) conversion.
     setTimeout(() => {
       try {
-        const converted = convertFile(f.name, f.data, nameOverride, inst, mlen);
+        const converted = convertFile(f.name, f.data, nameOverride, inst, mlen, off);
         setResults(converted);
       } catch (e) {
         setResults([]);
@@ -64,13 +65,13 @@ export default function App() {
         setError('');
         const fallback = sanitizeSongName(baseName(f.name));
         setSongName(fallback);
-        runConvert(parsed, undefined, instrument, maxLen);
+        runConvert(parsed, undefined, instrument, maxLen, offset);
       })
       .catch((e) => {
         setFile(null);
         setError(`读取文件失败：${e && e.message ? e.message : e}`);
       });
-  }, [runConvert, instrument, maxLen]);
+  }, [runConvert, instrument, maxLen, offset]);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();
@@ -87,16 +88,16 @@ export default function App() {
 
   const convertWithName = useCallback(() => {
     if (!file) return;
-    runConvert(file, songName, instrument, maxLen);
-  }, [file, songName, instrument, maxLen, runConvert]);
+    runConvert(file, songName, instrument, maxLen, offset);
+  }, [file, songName, instrument, maxLen, offset, runConvert]);
 
   const isSkyFile = file ? /\.(txt|json)$/i.test(file.name) : false;
 
   const onInstrumentChange = useCallback((e) => {
     const v = Number(e.target.value);
     setInstrument(v);
-    if (file) runConvert(file, songName, v, maxLen);
-  }, [file, songName, maxLen, runConvert]);
+    if (file) runConvert(file, songName, v, maxLen, offset);
+  }, [file, songName, maxLen, offset, runConvert]);
 
   return (
     <div className="app">
@@ -172,6 +173,21 @@ export default function App() {
                   <option key={ins.value} value={ins.value}>{ins.label}</option>
                 ))}
               </select>
+            </label>
+          )}
+          {isSkyFile && (
+            <label className="field">
+              <span className="field-label">基准偏移（半音）</span>
+              <input
+                className="field-input"
+                type="number"
+                min="-24"
+                max="24"
+                step="1"
+                value={offset}
+                onChange={(e) => setOffset(e.target.value)}
+                spellCheck={false}
+              />
             </label>
           )}
           <button className="btn" onClick={convertWithName} disabled={busy}>

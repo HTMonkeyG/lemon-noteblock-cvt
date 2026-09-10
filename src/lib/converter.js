@@ -33,9 +33,12 @@ const SKY_BASE_KEY = 39; // C4
 const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
 const SKY_INSTRUMENT = 0; // harp (default when none selected)
 
-/** Convert a Sky Studio lane index (0-14) to a note block key. */
-function skyLaneToKey(lane) {
-  return SKY_BASE_KEY + MAJOR_SCALE[lane % 7] + 12 * Math.floor(lane / 7);
+/**
+ * Convert a Sky Studio lane index (0-14) to a note block key, applying an
+ * optional semitone base offset (transposition).
+ */
+function skyLaneToKey(lane, offset = 0) {
+  return SKY_BASE_KEY + offset + MAJOR_SCALE[lane % 7] + 12 * Math.floor(lane / 7);
 }
 
 // Friendly labels for the 16 vanilla Bedrock note-block instruments.
@@ -121,7 +124,7 @@ export function parseNBS(buffer, songName) {
  * Parse a Sky Studio score (`.txt` or `.skysheet.json`) into one or more
  * unified songs (a `.skysheet.json` may hold several sheets).
  */
-export function parseSkyStudio(text, fallbackSongName, instrument = SKY_INSTRUMENT) {
+export function parseSkyStudio(text, fallbackSongName, instrument = SKY_INSTRUMENT, offset = 0) {
   const parsed = SkyStudioABC.deserialize(text);
   if (parsed == null) throw new Error('无法解析该 Sky Studio 文件。');
   const sheets = Array.isArray(parsed) ? parsed : [parsed];
@@ -130,6 +133,9 @@ export function parseSkyStudio(text, fallbackSongName, instrument = SKY_INSTRUME
   const inst = Number.isInteger(instrument) && instrument >= 0 && instrument <= 15
     ? instrument
     : SKY_INSTRUMENT;
+
+  // Coerce the semitone base offset (may arrive as a string from the UI).
+  const off = Number.isFinite(Number(offset)) ? Math.floor(Number(offset)) : 0;
 
   return sheets.map((sheet) => {
     let notes = sheet.notes;
@@ -144,7 +150,7 @@ export function parseSkyStudio(text, fallbackSongName, instrument = SKY_INSTRUME
       if (!tickMap.has(t)) tickMap.set(t, []);
       tickMap.get(t).push({
         instrument: inst,
-        key: skyLaneToKey(Number(n.key) || 0),
+        key: skyLaneToKey(Number(n.key) || 0, off),
       });
     }
 
@@ -343,9 +349,11 @@ export function toMCStructure(commands) {
  *   Ignored for .nbs, whose notes carry their own instrument.
  * @param {number} [maxLen] Max length of a single generated command before it
  *   is split across multiple command blocks (applies to both formats).
+ * @param {number} [offset] Semitone base offset (transposition) for Sky Studio
+ *   scores.  Ignored for .nbs.
  * @returns {Array<{ songName, noteCount, commands, size, mcstructure, txt }>}
  */
-export function convertFile(fileName, data, nameOverride, instrument, maxLen) {
+export function convertFile(fileName, data, nameOverride, instrument, maxLen, offset) {
   const lower = String(fileName || '').toLowerCase();
   const fallback = nameOverride
     ? sanitizeSongName(nameOverride)
@@ -357,7 +365,7 @@ export function convertFile(fileName, data, nameOverride, instrument, maxLen) {
     songs = [parseNBS(data, fallback)];
   } else if (lower.endsWith('.txt') || lower.endsWith('.json')) {
     const text = new TextDecoder().decode(data);
-    songs = parseSkyStudio(text, fallback, instrument);
+    songs = parseSkyStudio(text, fallback, instrument, offset);
   } else {
     throw new Error('不支持的文件类型。请选择 .nbs / .txt / .skysheet.json 文件。');
   }
