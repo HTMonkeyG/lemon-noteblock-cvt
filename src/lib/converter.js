@@ -26,12 +26,17 @@ const BLOCK_NAMES = [
 ];
 
 // Sky Studio exposes 15 note lanes (A1..A5, B1..B5, C1..C5), indexed 0-14.
-// Map each lane onto a chromatic semitone anchored at the note block default
-// (F#4 = key 45).  Lane 0 -> 45, lane 14 -> 59.  The `playsound` pitch formula
-// used downstream handles this range fine (it is not a note block, so the
-// 2-octave note block cap does not apply).
-const SKY_BASE_KEY = 45;
+// The lanes are successive degrees of the C major scale (C D E F G A B) — NOT
+// chromatic semitones.  Lane 0 = C4 (middle C, key 39), lane 14 = C6 (key 63).
+const SKY_BASE_KEY = 39; // C4
+// Semitone offsets of the C major scale within one octave.
+const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
 const SKY_INSTRUMENT = 0; // harp (default when none selected)
+
+/** Convert a Sky Studio lane index (0-14) to a note block key. */
+function skyLaneToKey(lane) {
+  return SKY_BASE_KEY + MAJOR_SCALE[lane % 7] + 12 * Math.floor(lane / 7);
+}
 
 // Friendly labels for the 16 vanilla Bedrock note-block instruments.
 const INSTRUMENT_LABELS = {
@@ -139,7 +144,7 @@ export function parseSkyStudio(text, fallbackSongName, instrument = SKY_INSTRUME
       if (!tickMap.has(t)) tickMap.set(t, []);
       tickMap.get(t).push({
         instrument: inst,
-        key: SKY_BASE_KEY + (Number(n.key) || 0),
+        key: skyLaneToKey(Number(n.key) || 0),
       });
     }
 
