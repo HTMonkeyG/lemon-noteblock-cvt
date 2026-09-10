@@ -274,42 +274,54 @@ function createCommandBlock(command, type, direction) {
   return { block, blockEntity };
 }
 
+// Bedrock `facing_direction` values, and the step each one activates:
+//   0 = y- (down), 1 = y+ (up), 2 = z- (north), 3 = z+ (south),
+//   4 = x- (west), 5 = x+ (east).
+function facingBetween(a, b) {
+  if (b.x !== a.x) return b.x > a.x ? 5 : 4;
+  if (b.y !== a.y) return b.y > a.y ? 1 : 0;
+  return b.z > a.z ? 3 : 2;
+}
+
 export function toMCStructure(commands) {
-  const basicSideLen = [4, 4, 4];
-  let expand = 0;
+  // Cube side length = ceil(cube root of the command count).
+  const side = Math.max(1, Math.ceil(Math.cbrt(commands.length)));
+  const planeSize = side * side;
 
-  while (commands.length > basicSideLen[0] * basicSideLen[1] * basicSideLen[2]) {
-    basicSideLen[expand] *= 2;
-    expand = (expand + 1) % 3;
-  }
+  // Map a linear index to a cell on a single S-shaped (serpentine) curve that
+  // fills the whole cube.  Consecutive indices land on face-adjacent cells, so
+  // the command blocks form one continuous chain.
+  //
+  //   x: slow axis, one (side x side) plane per layer.
+  //   y, z: 2D serpentine within the plane; odd x-layers run the plane in
+  //         reverse so each layer starts exactly where the previous one ended.
+  const positionAt = (i) => {
+    const x = Math.floor(i / planeSize);
+    let p = i % planeSize;
+    if (x % 2 === 1) p = planeSize - 1 - p;
+    const y = Math.floor(p / side);
+    const r = p % side;
+    const z = y % 2 === 0 ? r : side - 1 - r;
+    return { x, y, z };
+  };
 
-  const structure = new MCStructure(basicSideLen[0], basicSideLen[1], basicSideLen[2]);
-  const cursor = { x: 0, y: 0, z: 0 };
-  let head = true;
+  const structure = new MCStructure(side, side, side);
 
   for (let i = 0; i < commands.length; i++) {
-    const block = createCommandBlock(commands[i], head ? 1 : 2, 1);
-    if (head) head = false;
+    const cur = positionAt(i);
+    // Every block faces forward along the S-curve.  The final block points at
+    // the (empty) cell where a next block would sit, so the chain simply ends
+    // there — its facing matches the path's natural continuation.
+    const facing = facingBetween(cur, positionAt(i + 1));
 
-    structure.setBlock(cursor, block.block);
-    structure.setBlockData(cursor, block.blockEntity);
+    // First block = repeating (needs redstone), the rest = chain (always active).
+    const block = createCommandBlock(commands[i], i === 0 ? 1 : 2, facing);
 
-    cursor.y++;
-    if (cursor.y >= basicSideLen[1]) {
-      cursor.y = 0;
-      cursor.z++;
-      head = true;
-    }
-    if (cursor.z === basicSideLen[2]) {
-      cursor.z = 0;
-      cursor.x++;
-    }
+    structure.setBlock(cur, block.block);
+    structure.setBlockData(cur, block.blockEntity);
   }
 
-  return {
-    structure,
-    size: { x: basicSideLen[0], y: basicSideLen[1], z: basicSideLen[2] },
-  };
+  return { structure, size: { x: side, y: side, z: side } };
 }
 
 // ----------------------------------------------------------------------------
