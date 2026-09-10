@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
-import { convertFile, sanitizeSongName, SKY_INSTRUMENTS } from './lib/converter.js';
+import { convertFile, sanitizeSongName } from './lib/converter.js';
+import ConvertConfig from './components/ConvertConfig.jsx';
+import ConvertResults from './components/ConvertResults.jsx';
 
 const ACCEPT = '.nbs,.txt,.json,.skysheet.json,application/json,text/plain';
 
@@ -15,63 +17,32 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 export default function App() {
   const [file, setFile] = useState(null); // { name, size, data }
   const [songName, setSongName] = useState('');
+  const [maxLen, setMaxLen] = useState('2000');
+  const [instrument, setInstrument] = useState(0);
+  const [offset, setOffset] = useState('0');
   const [results, setResults] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [instrument, setInstrument] = useState(0);
-  const [maxLen, setMaxLen] = useState('2000');
-  const [offset, setOffset] = useState('0');
   const inputRef = useRef(null);
-
-  const runConvert = useCallback((f, nameOverride, inst, mlen, off) => {
-    setBusy(true);
-    setError('');
-    // Yield so the busy spinner paints before the (possibly heavy) conversion.
-    setTimeout(() => {
-      try {
-        const converted = convertFile(f.name, f.data, nameOverride, inst, mlen, off);
-        setResults(converted);
-      } catch (e) {
-        setResults([]);
-        setError(e && e.message ? e.message : String(e));
-      } finally {
-        setBusy(false);
-      }
-    }, 30);
-  }, []);
 
   const handleFile = useCallback((f) => {
     if (!f) return;
     f.arrayBuffer()
       .then((data) => {
-        const parsed = { name: f.name, size: f.size, data };
-        setFile(parsed);
+        setFile({ name: f.name, size: f.size, data });
         setResults([]);
         setError('');
-        const fallback = sanitizeSongName(baseName(f.name));
-        setSongName(fallback);
-        runConvert(parsed, undefined, instrument, maxLen, offset);
+        setSongName(sanitizeSongName(baseName(f.name)));
       })
       .catch((e) => {
         setFile(null);
         setError(`读取文件失败：${e && e.message ? e.message : e}`);
       });
-  }, [runConvert, instrument, maxLen, offset]);
+  }, []);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();
@@ -86,18 +57,24 @@ export default function App() {
     e.target.value = '';
   }, [handleFile]);
 
-  const convertWithName = useCallback(() => {
+  const onConvert = useCallback(() => {
     if (!file) return;
-    runConvert(file, songName, instrument, maxLen, offset);
-  }, [file, songName, instrument, maxLen, offset, runConvert]);
+    setBusy(true);
+    setError('');
+    // Yield so the busy spinner paints before the (possibly heavy) conversion.
+    setTimeout(() => {
+      try {
+        setResults(convertFile(file.name, file.data, songName, instrument, maxLen, offset));
+      } catch (e) {
+        setResults([]);
+        setError(e && e.message ? e.message : String(e));
+      } finally {
+        setBusy(false);
+      }
+    }, 30);
+  }, [file, songName, instrument, maxLen, offset]);
 
   const isSkyFile = file ? /\.(txt|json)$/i.test(file.name) : false;
-
-  const onInstrumentChange = useCallback((e) => {
-    const v = Number(e.target.value);
-    setInstrument(v);
-    if (file) runConvert(file, songName, v, maxLen, offset);
-  }, [file, songName, maxLen, offset, runConvert]);
 
   return (
     <div className="app">
@@ -137,77 +114,26 @@ export default function App() {
       </section>
 
       {file && (
-        <section className="controls">
-          <label className="field">
-            <span className="field-label">歌曲名（用于 scoreboard 与 tag）</span>
-            <input
-              className="field-input"
-              value={songName}
-              onChange={(e) => setSongName(e.target.value)}
-              placeholder="song"
-              spellCheck={false}
-            />
-          </label>
-          <label className="field">
-            <span className="field-label">指令最大长度（字符）</span>
-            <input
-              className="field-input"
-              type="number"
-              min="1"
-              step="50"
-              value={maxLen}
-              onChange={(e) => setMaxLen(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-          {isSkyFile && (
-            <label className="field">
-              <span className="field-label">音色（乐器）</span>
-              <select
-                className="field-input select"
-                value={instrument}
-                onChange={onInstrumentChange}
-                disabled={busy}
-              >
-                {SKY_INSTRUMENTS.map((ins) => (
-                  <option key={ins.value} value={ins.value}>{ins.label}</option>
-                ))}
-              </select>
-            </label>
-          )}
-          {isSkyFile && (
-            <label className="field">
-              <span className="field-label">基准偏移（半音）</span>
-              <input
-                className="field-input"
-                type="number"
-                min="-24"
-                max="24"
-                step="1"
-                value={offset}
-                onChange={(e) => setOffset(e.target.value)}
-                spellCheck={false}
-              />
-            </label>
-          )}
-          <button className="btn" onClick={convertWithName} disabled={busy}>
-            {busy ? '转换中…' : '重新转换'}
-          </button>
-        </section>
+        <ConvertConfig
+          songName={songName}
+          onSongNameChange={setSongName}
+          maxLen={maxLen}
+          onMaxLenChange={setMaxLen}
+          instrument={instrument}
+          onInstrumentChange={setInstrument}
+          offset={offset}
+          onOffsetChange={setOffset}
+          isSkyFile={isSkyFile}
+          busy={busy}
+          onConvert={onConvert}
+        />
       )}
 
       {busy && <p className="status">正在转换，请稍候…</p>}
 
       {error && <p className="error">{error}</p>}
 
-      {!busy && results.length > 0 && (
-        <section className="results">
-          <h2>转换结果</h2>
-          {results.map((r, i) => (
-            <ResultCard key={i} result={r} />
-          ))}
-        </section>
-      )}
+      {!busy && <ConvertResults results={results} />}
 
       {!busy && !error && !file && (
         <section className="howto">
@@ -230,65 +156,5 @@ export default function App() {
         <span>Developed only for OxygenLemon</span><br />
       </footer>
     </div>
-  );
-}
-
-function ResultCard({ result }) {
-  const [showCommands, setShowCommands] = useState(false);
-
-  const onSaveMC = () => {
-    downloadBlob(
-      new Blob([result.mcstructure], { type: 'application/octet-stream' }),
-      `${result.songName}.mcstructure`,
-    );
-  };
-  const onSaveTxt = () => {
-    downloadBlob(
-      new Blob([result.txt], { type: 'text/plain;charset=utf-8' }),
-      `${result.songName}.txt`,
-    );
-  };
-
-  const sizeText = `${result.size.x}×${result.size.y}×${result.size.z}`;
-  const preview = result.txt.split('\n').slice(0, 20);
-
-  return (
-    <article className="card">
-      <div className="card-head">
-        <h3 className="card-title">{result.songName}</h3>
-        <div className="card-actions">
-          <button className="btn primary" onClick={onSaveMC}>下载 .mcstructure</button>
-          <button className="btn" onClick={onSaveTxt}>下载 .txt</button>
-        </div>
-      </div>
-
-      <dl className="stats">
-        <div className="stat">
-          <dt>音符事件</dt>
-          <dd>{result.noteCount}</dd>
-        </div>
-        <div className="stat">
-          <dt>命令方块</dt>
-          <dd>{result.commandCount}</dd>
-        </div>
-        <div className="stat">
-          <dt>结构尺寸</dt>
-          <dd>{sizeText}</dd>
-        </div>
-      </dl>
-
-      <button
-        className="toggle"
-        onClick={() => setShowCommands((v) => !v)}
-      >
-        {showCommands ? '收起指令预览' : '展开指令预览'}
-      </button>
-
-      {showCommands && (
-        <pre className="commands">
-          <code>{preview.join('\n')}{result.commandCount > 20 ? `\n… 共 ${result.commandCount} 条` : ''}</code>
-        </pre>
-      )}
-    </article>
   );
 }
