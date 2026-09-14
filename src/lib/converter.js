@@ -187,6 +187,50 @@ function toPlaySound(note) {
   return `playsound ${sound} @s ~~~ 1.0 ${Math.pow(2, (note.key - 45) / 12)}`;
 }
 
+function createProgressBar(name, exeTarget, exeTmr, songMaxTicks) {
+  const buildRangedSelector = (max) => `@e[type=armor_stand,name=${tempEntityName},scores={generic.song=..${Math.floor(max)}}]`;
+
+  function buildRawText(numSegments = 8) {
+    const inteval = songMaxTicks / numSegments;
+    const selectors = [];
+    const segments = [];
+
+    for (var i = 0; i <= numSegments; i++) {
+      i && selectors.push({ "selector": buildRangedSelector(inteval * i) });
+      segments.push({ "text": `${"§a".padEnd(i + 2, "=")}${"§f".padEnd(numSegments - i + 2, "=")}` });
+    }
+
+    return {
+      "rawtext": [
+        { "text": `§f${name} [` },
+        {
+          "translate": `%%${numSegments + 1}`,
+          "with": {
+            "rawtext": [
+              ...selectors,
+              ...segments
+            ]
+          }
+        },
+        { "text": `]§f ` },
+        { "score": { "objective": "generic.song", "name": "tick." + name } },
+        { "text": `/${songMaxTicks}` },
+      ]
+    };
+  }
+
+  const tempEntityName = `"progress.${name}"`;
+  const tempEntitySelector = `@e[type=armor_stand,name=${tempEntityName}]`;
+  const tempEntityScore = `${tempEntitySelector} generic.song`;
+
+  return [
+    `summon armor_stand ${tempEntityName}`,
+    `scoreboard players operation ${tempEntityScore} = ${exeTmr}`,
+    `titleraw ${exeTarget} actionbar ${JSON.stringify(buildRawText())}`,
+    `kill ${tempEntitySelector}`
+  ]
+}
+
 export function toCommands(song, maxLen = 2000) {
   // Coerce & clamp the per-command length limit to a sane positive integer.
   maxLen = Math.floor(Number(maxLen));
@@ -210,10 +254,12 @@ export function toCommands(song, maxLen = 2000) {
 
   const notes = new Map();
   const commands = [];
+  let maxTicks = 0;
 
   for (const a of song.effectiveTicks) {
     const gametick = Math.round(song.getTimeGtFor(a.tick));
     const tickNoteDup = {};
+    maxTicks = Math.max(gametick);
 
     for (const b of a.notes) {
       let hash = buildHash(b, 1);
@@ -258,6 +304,8 @@ export function toCommands(song, maxLen = 2000) {
     command += commandEnd(toPlaySound(note));
     commands.push(command);
   }
+
+  commands.unshift(...createProgressBar(name, exeTarget, exeTmr, maxTicks));
 
   return commands;
 }
