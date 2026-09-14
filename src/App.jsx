@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { convertFile, sanitizeSongName } from './lib/converter.js';
+import { convertFile, sanitizeSongName } from './lib/Converter.js';
 import ConvertConfig from './components/ConvertConfig.jsx';
 import ConvertResults from './components/ConvertResults.jsx';
 

@@ -1,4 +1,4 @@
-import { SKY_INSTRUMENTS } from '../lib/converter.js';
+import { SKY_INSTRUMENTS } from '../lib/Converter.js';
 
 export default function ConvertConfig({
   songName,
