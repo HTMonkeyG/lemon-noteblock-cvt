@@ -277,10 +277,10 @@ class TellrawCommandBuilder extends CommandStringBuilder {
     return this;
   }
 
-  addTranslate(key, with_components = []) {
+  addTranslate(key, components = []) {
     const component = { translate: key + "" };
-    if (with_components.length > 0) {
-      component.with = { rawtext: with_components };
+    if (components.length > 0) {
+      component.with = { rawtext: components };
     }
     this.rawtext.push(component);
     return this;
@@ -293,11 +293,6 @@ class TellrawCommandBuilder extends CommandStringBuilder {
     return `tellraw ${this.target} ${JSON.stringify({ rawtext: this.rawtext })}`;
   }
 }
-
-var a = new SelectorBuilder();
-a.addSimpleCondition("tag", "name");
-a.addScoreRange("tag", new ScoreRange(10, 1));
-console.log(a.finalize())
 
 class ComplementaryScoreRange {
   constructor() {

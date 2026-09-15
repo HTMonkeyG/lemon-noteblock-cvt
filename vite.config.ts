@@ -1,9 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { makeOffline } from "vite-plugin-make-offline";
 
 export default defineConfig({
-  plugins: [react(), makeOffline()],
+  plugins: [react()],
   publicDir: 'public',
   build: {
     outDir: 'dist',

@@ -349,13 +349,13 @@ class StructureBuilder {
     const blockEntity = PMR.createBlockEntity(BLOCK_NAMES[type]);
 
     block.name = BLOCK_NAMES[type];
-    block.states['i32>facing_direction'] = direction;
+    block.states.facing_direction = direction;
 
     blockEntity.Command = command;
     blockEntity.auto = type === 2 ? 1 : 0;
     blockEntity.conditionalMode = 0;
     blockEntity.conditionMet = 1;
-    blockEntity['i8>LPConditionalMode'] = 0;
+    blockEntity.LPConditionalMode = 0;
     blockEntity.LPRedstoneMode = type === 2 ? 0 : 1;
 
     return { block, blockEntity };
