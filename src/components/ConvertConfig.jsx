@@ -9,6 +9,8 @@ export default function ConvertConfig({
   onInstrumentChange,
   offset,
   onOffsetChange,
+  showProgressBar,
+  onShowProgressBarChange,
   isSkyFile,
   busy,
   onConvert,
@@ -37,6 +39,16 @@ export default function ConvertConfig({
           onChange={(e) => onMaxLenChange(e.target.value)}
           spellCheck={false}
         />
+      </label>
+
+      <label className="field checkbox-field">
+        <input
+          type="checkbox"
+          checked={showProgressBar}
+          onChange={(e) => onShowProgressBarChange(e.target.checked)}
+          disabled={busy}
+        />
+        <span className="field-label">启用进度条</span>
       </label>
 
       {isSkyFile && (

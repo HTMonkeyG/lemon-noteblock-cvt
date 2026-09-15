@@ -23,6 +23,7 @@ export default function App() {
   const [maxLen, setMaxLen] = useState('2000');
   const [instrument, setInstrument] = useState(0);
   const [offset, setOffset] = useState('0');
+  const [showProgressBar, setShowProgressBar] = useState(true);
   const [results, setResults] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,7 +65,7 @@ export default function App() {
     // Yield so the busy spinner paints before the (possibly heavy) conversion.
     setTimeout(() => {
       try {
-        setResults(convertFile(file.name, file.data, songName, instrument, maxLen, offset));
+        setResults(convertFile(file.name, file.data, songName, instrument, maxLen, offset, showProgressBar));
       } catch (e) {
         setResults([]);
         setError(e && e.message ? e.message : String(e));
@@ -72,7 +73,7 @@ export default function App() {
         setBusy(false);
       }
     }, 30);
-  }, [file, songName, instrument, maxLen, offset]);
+  }, [file, songName, instrument, maxLen, offset, showProgressBar]);
 
   const isSkyFile = file ? /\.(txt|json)$/i.test(file.name) : false;
 
@@ -123,6 +124,8 @@ export default function App() {
           onInstrumentChange={setInstrument}
           offset={offset}
           onOffsetChange={setOffset}
+          showProgressBar={showProgressBar}
+          onShowProgressBarChange={setShowProgressBar}
           isSkyFile={isSkyFile}
           busy={busy}
           onConvert={onConvert}

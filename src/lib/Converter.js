@@ -19,6 +19,7 @@ import {
   ScoreRange,
   ScoreboardRef,
   TellrawCommandBuilder,
+  ComplementaryScoreRange,
 } from './CommandBuilder.js';
 
 const { NBS, INSTBE } = NBSModule;
@@ -170,36 +171,38 @@ class CommandGenerator {
       }
     }
 
-    // Generate commands for each unique note using ExecuteCommandBuilder
+    // Generate commands for each unique note using ComplementaryScoreRange
     for (const [hash, ticks] of notes.entries()) {
       const note = this._expandHash(hash);
       let builder = this._createExecuteBuilder();
-      let time = -1;
+      let complementRange = new ComplementaryScoreRange();
 
       for (const tick of ticks) {
-        if (tick === 0 || (tick !== time + 1 && tick !== time)) {
-          const range = new ScoreRange(
-            time === -1 ? ScoreRange.kScoreMin : time + 1,
-            tick - 1
-          );
-          builder.addSubcommand(this._createScoreCondition(range, true));
-        }
-        time = tick;
+        complementRange.addPoint(tick);
 
         const estimatedLength = builder.estimate() + 100; // +100 for final payload
         if (estimatedLength > this.maxCommandLength) {
-          const finalRange = new ScoreRange(time + 1, ScoreRange.kScoreMax);
-          builder.addSubcommand(this._createScoreCondition(finalRange, true));
+          // Finalize current builder with complement
+          const ranges = complementRange.complement().finalize();
+          for (const range of ranges) {
+            console.log(range);
+            builder.addSubcommand(this._createScoreCondition(range, true));
+          }
           builder.setRunCommand(this._toPlaySound(note));
           commands.push(builder.finalize());
 
+          // Start a new builder
           builder = this._createExecuteBuilder();
-          time = -1;
+          complementRange = new ComplementaryScoreRange();
+          complementRange.addPoint(tick);
         }
       }
 
-      const finalRange = new ScoreRange(time + 1, ScoreRange.kScoreMax);
-      builder.addSubcommand(this._createScoreCondition(finalRange, true));
+      // Finalize the last builder
+      const ranges = complementRange.complement().finalize();
+      for (const range of ranges) {
+        builder.addSubcommand(this._createScoreCondition(range, true));
+      }
       builder.setRunCommand(this._toPlaySound(note));
       commands.push(builder.finalize());
     }
@@ -301,20 +304,31 @@ class CommandGenerator {
 class StructureBuilder {
   constructor(commands) {
     this.commands = commands;
-    this.side = Math.max(1, Math.ceil(Math.cbrt(commands.length)));
-    this.planeSize = this.side * this.side;
+    // Fixed dimensions: x=3, y=5, z=unlimited
+    this.sizeX = 3;
+    this.sizeY = 5;
+    this.planeSize = this.sizeX * this.sizeY; // 15 blocks per z-layer
+    this.sizeZ = Math.ceil(commands.length / this.planeSize);
   }
 
   /**
-   * Map linear index to 3D position on a serpentine curve.
+   * Map linear index to 3D position with YXZ ordering.
+   * Order: Y changes fastest, then X, then Z.
    */
   _positionAt(i) {
-    const x = Math.floor(i / this.planeSize);
+    const z = Math.floor(i / this.planeSize);
     let p = i % this.planeSize;
-    if (x % 2 === 1) p = this.planeSize - 1 - p;
-    const y = Math.floor(p / this.side);
-    const r = p % this.side;
-    const z = y % 2 === 0 ? r : this.side - 1 - r;
+
+    // Reverse direction on odd z-layers for serpentine pattern
+    if (z % 2 === 1) p = this.planeSize - 1 - p;
+
+    // Within each z-plane: y changes fastest, then x
+    const x = Math.floor(p / this.sizeY);
+    const r = p % this.sizeY;
+
+    // Serpentine within the plane: alternate y direction on odd x
+    const y = x % 2 === 0 ? r : this.sizeY - 1 - r;
+
     return { x, y, z };
   }
 
@@ -351,7 +365,7 @@ class StructureBuilder {
    * Build the MCStructure.
    */
   build() {
-    const structure = new MCStructure(this.side, this.side, this.side);
+    const structure = new MCStructure(this.sizeX, this.sizeY, this.sizeZ);
 
     for (let i = 0; i < this.commands.length; i++) {
       const cur = this._positionAt(i);
@@ -368,7 +382,7 @@ class StructureBuilder {
 
     return {
       structure,
-      size: { x: this.side, y: this.side, z: this.side }
+      size: { x: this.sizeX, y: this.sizeY, z: this.sizeZ }
     };
   }
 }
@@ -380,7 +394,7 @@ class StructureBuilder {
 class Converter {
   constructor(options = {}) {
     this.maxCommandLength = options.maxCommandLength || 2000;
-    this.showProgressBar = options.showProgressBar !== false;
+    this.showProgressBar = options.showProgressBar !== false; // Default: true
   }
 
   /**
@@ -469,10 +483,14 @@ class Converter {
  * @param {number} instrument - Sky Studio instrument index
  * @param {string|number} maxLen - Maximum command length
  * @param {string|number} offset - Sky Studio pitch offset
+ * @param {boolean} showProgressBar - Whether to include progress bar (default: true)
  * @returns {Array} Array of conversion results
  */
-export function convertFile(fileName, data, nameOverride, instrument, maxLen, offset) {
-  const converter = new Converter(Number(maxLen) || 2000);
+export function convertFile(fileName, data, nameOverride, instrument, maxLen, offset, showProgressBar = true) {
+  const converter = new Converter({
+    maxCommandLength: Number(maxLen) || 2000,
+    showProgressBar: showProgressBar !== false,
+  });
   return converter.convertFile(
     fileName,
     data,

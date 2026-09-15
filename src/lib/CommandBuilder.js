@@ -62,7 +62,7 @@ class ScoreRange extends CommandStringBuilder {
 
 class ScoreboardRef extends CommandStringBuilder {
   static copy(range) {
-    return new ScoreRange(range.objective, range.name);
+    return new ScoreboardRef(range.objective, range.name);
   }
 
   constructor(objective, name) {
@@ -74,7 +74,7 @@ class ScoreboardRef extends CommandStringBuilder {
   finalize() {
     if (this.name instanceof CommandStringBuilder)
       return `${this.name.finalize()} ${CommandStringBuilder.toStringLiteral(this.objective)}`;
-    return `${CommandStringBuilder.toStringLiteral(this.name.finalize())} ${CommandStringBuilder.toStringLiteral(this.objective)}`;
+    return `${CommandStringBuilder.toStringLiteral(this.name)} ${CommandStringBuilder.toStringLiteral(this.objective)}`;
   }
 }
 
