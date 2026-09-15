@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "mcstructure-js": "^1.3.0",
+    "mcstructure-js": "^2.0.0",
     "nbs-note.js": "^1.3.0",
-    "project-mirror-registry": "^1.3.0",
+    "project-mirror-registry": "^2.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "sky-studio-abc-js": "^1.0.0"
