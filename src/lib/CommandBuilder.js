@@ -299,6 +299,12 @@ class ComplementaryScoreRange {
     this.ranges = [];
   }
 
+  clone() {
+    var copy = new ComplementaryScoreRange();
+    copy.ranges = this.ranges.map(range => ScoreRange.copy(range));
+    return copy;
+  }
+
   addPoint(value) {
     value |= 0;
     this.ranges.push(new ScoreRange(value, value));

@@ -146,7 +146,6 @@ class CommandGenerator {
    */
   _generateNoteCommands() {
     const notes = new Map();
-    const commands = [];
 
     // Collect all notes grouped by (instrument, key, dupCount)
     for (const tick of this.song.effectiveTicks) {
@@ -172,42 +171,72 @@ class CommandGenerator {
     }
 
     // Generate commands for each unique note using ComplementaryScoreRange
+    const commands = [];
+
     for (const [hash, ticks] of notes.entries()) {
       const note = this._expandHash(hash);
+      const runCommand = this._toPlaySound(note);
       let builder = this._createExecuteBuilder();
       let complementRange = new ComplementaryScoreRange();
 
       for (const tick of ticks) {
-        complementRange.addPoint(tick);
+        // Project the command length as if this tick were already included, so
+        // the estimate accounts for every complement range it would add plus
+        // the run payload — not just the builder's current contents.
+        const candidate = complementRange.clone();
+        candidate.addPoint(tick);
 
-        const estimatedLength = builder.estimate() + 100; // +100 for final payload
-        if (estimatedLength > this.maxCommandLength) {
-          // Finalize current builder with complement
-          const ranges = complementRange.complement().finalize();
-          for (const range of ranges) {
-            console.log(range);
-            builder.addSubcommand(this._createScoreCondition(range, true));
-          }
-          builder.setRunCommand(this._toPlaySound(note));
-          commands.push(builder.finalize());
+        const exceedsLimit =
+          complementRange.ranges.length > 0 &&
+          this._projectCommandLength(builder, candidate, runCommand) > this.maxCommandLength;
 
-          // Start a new builder
+        if (exceedsLimit) {
+          // Flush the accumulated ticks *without* the new one, so it is only
+          // played by the command about to be started.
+          commands.push(this._finalizeNoteCommand(builder, complementRange, runCommand));
+
           builder = this._createExecuteBuilder();
           complementRange = new ComplementaryScoreRange();
-          complementRange.addPoint(tick);
         }
+
+        complementRange.addPoint(tick);
       }
 
       // Finalize the last builder
-      const ranges = complementRange.complement().finalize();
-      for (const range of ranges) {
-        builder.addSubcommand(this._createScoreCondition(range, true));
-      }
-      builder.setRunCommand(this._toPlaySound(note));
-      commands.push(builder.finalize());
+      commands.push(this._finalizeNoteCommand(builder, complementRange, runCommand));
     }
 
     return commands;
+  }
+
+  /**
+   * Attach the complement score conditions and the run command to a builder,
+   * then finalize it into a command string.
+   */
+  _finalizeNoteCommand(builder, complementRange, runCommand) {
+    const ranges = complementRange.complement().finalize();
+    for (const range of ranges) {
+      builder.addSubcommand(this._createScoreCondition(range, true));
+    }
+    builder.setRunCommand(runCommand);
+    return builder.finalize();
+  }
+
+  /**
+   * Estimate the finalized length of a note command for the given ticks,
+   * counting every complement range subcommand and the run payload.
+   * Neither `builder` nor `complementRange` is mutated.
+   */
+  _projectCommandLength(builder, complementRange, runCommand) {
+    let length = builder.estimate() + " run ".length + runCommand.length;
+
+    const ranges = complementRange.clone().complement().finalize();
+    for (const range of ranges) {
+      // +1 for the space separating each subcommand.
+      length += 1 + this._createScoreCondition(range, true).finalize().length;
+    }
+
+    return length;
   }
 
   /**
